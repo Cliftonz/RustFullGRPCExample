@@ -1,0 +1,35 @@
+
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package voting;
+
+service Voting {
+    rpc Vote (VotingRequest) returns (VotingResponse);
+    rpc BatchVote(stream VotingRequest) returns (google.protobuf.Empty);
+    rpc VotingStream (stream VotingRequest) returns (stream VotingResponse);
+    rpc WatchStream(google.protobuf.Empty)returns (stream VotingResponse );
+    rpc Status (google.protobuf.Empty) returns (StatusResponse);
+}
+
+message Empty {}
+
+message VotingRequest {
+    string url = 1;
+
+    enum Vote {
+        UP = 0;
+        DOWN = 1;
+    }
+    Vote vote = 2;
+}
+
+message VotingResponse {
+    string confirmation = 1;
+}
+
+message StatusResponse {
+    map<string, int32> candidates = 1;
+}
+
