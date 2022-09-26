@@ -3,8 +3,10 @@ extern crate lazy_static;
 extern crate pub_sub;
 
 use std::collections::HashMap;
+use std::convert::Infallible;
+use std::fmt::Debug;
+use std::future;
 use pub_sub::PubSub;
-use async_stream;
 use std::ops::{Deref};
 use std::pin::Pin;
 use std::sync::Mutex;
@@ -15,13 +17,15 @@ use log4rs::config::{Appender, Root};
 use log4rs::Config;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status, Streaming};
-use tonic::metadata::MetadataValue;
+use tonic::metadata::{KeyAndValueRef, MetadataValue};
 use tonic_health::server::HealthReporter;
 use tonic_reflection::server::Builder;
 use crossbeam_queue::SegQueue;
 use crossbeam_channel::{unbounded};
 use crossbeam;
 use tokio::sync::mpsc;
+use tonic::codegen::http::Version;
+use tonic::transport::Error;
 use voting::{
     voting_server::{Voting, VotingServer},
     VotingRequest, VotingResponse, StatusResponse,
@@ -48,7 +52,7 @@ fn match_vote(url: String, vote: i32) -> Result<Response<VotingResponse>, Status
         0 => {
             map.entry(url.to_string()).and_modify(|counter| *counter += 1).or_insert(1);
             let resp = Response::new(voting::VotingResponse {
-                confirmation: { format!("Happy to confirm that you upvoted for {} who now has {} votes.", url, map.get_key_value(&*url.to_string()).unwrap().1  ) },
+                confirmation: { format!("Happy to confirm that you up-voted for {} who now has {} votes.", url, map.get_key_value(&*url.to_string()).unwrap().1  ) },
             });
             CCHANNEL.0.send(resp.get_ref().clone()).unwrap();
             Ok(resp)
@@ -56,7 +60,7 @@ fn match_vote(url: String, vote: i32) -> Result<Response<VotingResponse>, Status
         1 => {
             map.entry(url.to_string()).and_modify(|counter| *counter -= 1).or_insert(1);
             let resp = Response::new(voting::VotingResponse {
-                confirmation: { format!("Confirmation that you downvoted for {} who now has {} votes.", url, map.get_key_value(&*url.to_string()).unwrap().1) },
+                confirmation: { format!("Confirmation that you down-voted for {} who now has {} votes.", url, map.get_key_value(&*url.to_string()).unwrap().1) },
             });
             CCHANNEL.0.send(resp.get_ref().clone()).unwrap();
             Ok(resp)
@@ -156,7 +160,7 @@ impl Voting for VotingService {
 
     async fn batch_vote(
         &self,
-        request: Request<tonic::Streaming<VotingRequest>>,
+        request: Request<Streaming<VotingRequest>>,
     ) -> Result<Response<()>, Status> {
 
         let mut stream: Streaming<VotingRequest> = request.into_inner();
@@ -177,7 +181,7 @@ impl Voting for VotingService {
 
     async fn voting_stream(
         &self,
-        request: Request<tonic::Streaming<VotingRequest>>,
+        request: Request<Streaming<VotingRequest>>,
     ) -> Result<Response<Self::VotingStreamStream>, Status> {
 
         let (tx, rx) = mpsc::channel(1);
@@ -245,7 +249,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let voting_service = VotingService::default();
 
     info!("Configuring Authentication");
-    let svc =  voting::voting_server::VotingServer::with_interceptor(voting_service, check_auth);
+    let auth =  voting::voting_server::VotingServer::with_interceptor(voting_service, check_auth);
 
     info!("Configuring Health Check");
     let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
@@ -265,7 +269,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("GreeterServer listening on {}", address);
     Server::builder()
         .add_service(reflection_service)
-        .add_service(svc)
+        .add_service(auth)
         .add_service(health_service)
         .serve(address)
         .await?;
@@ -273,12 +277,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn check_auth(req: Request<()>) -> Result<Request<()>, Status> {
-    let token: MetadataValue<_> = "Bearer some-secret-token".parse().unwrap();
-
-    info!("token is \'{}\'", token.to_str().unwrap());
+    let token: MetadataValue<_> = "Bearer some-auth-token".parse().unwrap();
 
     match req.metadata().get("authorization") {
-        Some(t) if !token.is_empty() => { info!("value is {}",t.to_str().unwrap()); Ok(req)  },
+        Some(t) => {
+            if t == token {
+                Ok(req)
+            }else {
+                Err(Status::unauthenticated("No valid auth token"))
+            }
+
+        },
         _ => Err(Status::unauthenticated("No valid auth token")),
     }
+
 }

@@ -125,6 +125,69 @@ pub mod voting_client {
             let path = http::uri::PathAndQuery::from_static("/voting.Voting/Vote");
             self.inner.unary(request.into_request(), path, codec).await
         }
+        pub async fn batch_vote(
+            &mut self,
+            request: impl tonic::IntoStreamingRequest<Message = super::VotingRequest>,
+        ) -> Result<tonic::Response<()>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/voting.Voting/BatchVote");
+            self.inner
+                .client_streaming(request.into_streaming_request(), path, codec)
+                .await
+        }
+        pub async fn voting_stream(
+            &mut self,
+            request: impl tonic::IntoStreamingRequest<Message = super::VotingRequest>,
+        ) -> Result<
+            tonic::Response<tonic::codec::Streaming<super::VotingResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/voting.Voting/VotingStream",
+            );
+            self.inner.streaming(request.into_streaming_request(), path, codec).await
+        }
+        pub async fn watch_stream(
+            &mut self,
+            request: impl tonic::IntoRequest<()>,
+        ) -> Result<
+            tonic::Response<tonic::codec::Streaming<super::VotingResponse>>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/voting.Voting/WatchStream",
+            );
+            self.inner.server_streaming(request.into_request(), path, codec).await
+        }
         pub async fn status(
             &mut self,
             request: impl tonic::IntoRequest<()>,
@@ -155,6 +218,30 @@ pub mod voting_server {
             &self,
             request: tonic::Request<super::VotingRequest>,
         ) -> Result<tonic::Response<super::VotingResponse>, tonic::Status>;
+        async fn batch_vote(
+            &self,
+            request: tonic::Request<tonic::Streaming<super::VotingRequest>>,
+        ) -> Result<tonic::Response<()>, tonic::Status>;
+        ///Server streaming response type for the VotingStream method.
+        type VotingStreamStream: futures_core::Stream<
+                Item = Result<super::VotingResponse, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        async fn voting_stream(
+            &self,
+            request: tonic::Request<tonic::Streaming<super::VotingRequest>>,
+        ) -> Result<tonic::Response<Self::VotingStreamStream>, tonic::Status>;
+        ///Server streaming response type for the WatchStream method.
+        type WatchStreamStream: futures_core::Stream<
+                Item = Result<super::VotingResponse, tonic::Status>,
+            >
+            + Send
+            + 'static;
+        async fn watch_stream(
+            &self,
+            request: tonic::Request<()>,
+        ) -> Result<tonic::Response<Self::WatchStreamStream>, tonic::Status>;
         async fn status(
             &self,
             request: tonic::Request<()>,
@@ -251,6 +338,123 @@ pub mod voting_server {
                                 send_compression_encodings,
                             );
                         let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/voting.Voting/BatchVote" => {
+                    #[allow(non_camel_case_types)]
+                    struct BatchVoteSvc<T: Voting>(pub Arc<T>);
+                    impl<
+                        T: Voting,
+                    > tonic::server::ClientStreamingService<super::VotingRequest>
+                    for BatchVoteSvc<T> {
+                        type Response = ();
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<
+                                tonic::Streaming<super::VotingRequest>,
+                            >,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move { (*inner).batch_vote(request).await };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = BatchVoteSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.client_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/voting.Voting/VotingStream" => {
+                    #[allow(non_camel_case_types)]
+                    struct VotingStreamSvc<T: Voting>(pub Arc<T>);
+                    impl<T: Voting> tonic::server::StreamingService<super::VotingRequest>
+                    for VotingStreamSvc<T> {
+                        type Response = super::VotingResponse;
+                        type ResponseStream = T::VotingStreamStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<
+                                tonic::Streaming<super::VotingRequest>,
+                            >,
+                        ) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).voting_stream(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = VotingStreamSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/voting.Voting/WatchStream" => {
+                    #[allow(non_camel_case_types)]
+                    struct WatchStreamSvc<T: Voting>(pub Arc<T>);
+                    impl<T: Voting> tonic::server::ServerStreamingService<()>
+                    for WatchStreamSvc<T> {
+                        type Response = super::VotingResponse;
+                        type ResponseStream = T::WatchStreamStream;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::ResponseStream>,
+                            tonic::Status,
+                        >;
+                        fn call(&mut self, request: tonic::Request<()>) -> Self::Future {
+                            let inner = self.0.clone();
+                            let fut = async move {
+                                (*inner).watch_stream(request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = WatchStreamSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            );
+                        let res = grpc.server_streaming(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
