@@ -57,3 +57,16 @@ Streams all votes happening in real time to the client. Returns the new amount f
 #### VotingStream
 Allows the client to stream votes to the server and will echo back the votes that it submitted.
 
+## TODO
+- Switch interceptor(s) to tower
+- Implement [Cors with tower](https://docs.rs/tower-http/0.3.4/tower_http/cors/index.html) 
+- Implement [compression](https://github.com/hyperium/tonic/blob/master/examples/src/compression/server.rs) configurability with gzip and zstd
+- Implement Optional Health Service
+- Implement Configuration
+- Implement Full [Tracing](https://github.com/hyperium/tonic/blob/master/examples/src/tracing/server.rs)
+- Try [gendocu](https://gendocu.com/) for doc generation
+- Implement Rust client example for each method
+- Implement Load balancing on client side
+- Implement Keep alive time for client side
+
+
